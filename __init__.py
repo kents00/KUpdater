@@ -14,11 +14,11 @@ bl_info = {
 import bpy
 import requests
 import webbrowser
-import threading
 import json
 import io
 import zipfile
 import os
+import datetime
 
 class GithubEngine:
     def __init__(self):
@@ -26,13 +26,19 @@ class GithubEngine:
         self._token = None
         self._user = None
         self._repo = None
+        self._current_version = None
+        self._latest_version = None
+        self._response = None
+        self._update_date = None
 
     def clear_state(self):
         self._token = None
         self._user = None
         self._repo = None
-
-    # Getters and Setters for GitHub repository details
+        self._current_version = None
+        self._latest_version = None
+        self._response = None
+        self._update_date = None
 
     @property
     def token(self):
@@ -65,6 +71,10 @@ class GithubEngine:
     def api_url(self):
         return self._api_url
 
+    @property
+    def update_date(self):
+        return self._update_date
+
     @api_url.setter
     def api_url(self, value):
         if not self.check_is_url(value):
@@ -79,13 +89,8 @@ class GithubEngine:
             return False
         return True
 
-
     @bpy.app.handlers.persistent
     def check_for_updates(self):
-        if not self._user or not self._repo:
-            print("GitHub user and repository details are not set.")
-            return None
-
         update_url = f"{self._api_url}/repos/{self._user}/{self._repo}/releases/latest"
 
         try:
@@ -98,13 +103,40 @@ class GithubEngine:
         data = json.loads(response.text)
         latest_version = data["tag_name"]
 
+
         current_version = f"{bl_info['version'][0]}.{bl_info['version'][1]}.{bl_info['version'][2]}"
+        self._update_date = datetime.datetime.now()
+        self._latest_version = latest_version
+        self._current_version = current_version
+
         if latest_version != current_version:
-            print("A new version is available!")
             return latest_version
         else:
-            print("You are already using the latest version of the add-on.")
             return None
+
+
+    @bpy.app.handlers.persistent
+    def update(self):
+        zipball_url = f"{self.api_url}/repos/{self.user}/{self.repo}/zipball/{self.check_for_updates()}"
+
+        response = requests.get(zipball_url)
+        self._response = response
+
+        addon_path = os.path.dirname(__file__)
+        zip_data = io.BytesIO(response.content)
+
+        try:
+            with zipfile.ZipFile(zip_data, 'r') as zip_ref:
+                # Extract the contents of the zipball to the add-on's directory
+                for name in zip_ref.namelist():
+                    file_path = os.path.join(addon_path, name)
+                    if os.path.exists(file_path):
+                        os.rmdir(file_path)
+                zip_ref.extractall(addon_path)
+        except zipfile.BadZipFile as e:
+            print("Error extracting zip file:", e)
+            return None
+
 
 engine = GithubEngine()
 
@@ -127,36 +159,41 @@ class Release_Notes(bpy.types.Operator):
 
 class Update(bpy.types.Operator):
     bl_label = "Update"
+    bl_idname = "addonupdater.checkupdate"
+
+    def invoke(self,context, event):
+        self.execute(self)
+        return {'FINISHED'}
+
+    def execute(self,context):
+        engine.update()
+        if engine._response.status_code != 200:
+            self.report({'ERROR'},"Error getting update")
+            return {'CANCELLED'}
+
+        self.report({'INFO'}, "Add-on has been updated. Please restart Blender to apply changes.")
+        return {'FINISHED'}
+
+class Check_for_update(bpy.types.Operator):
+    bl_label = "Check Update"
     bl_idname = "addonupdater.update"
 
     def invoke(self, context, event):
-        threading.Thread(target=self.execute, args=(context,)).start()
+        self.execute(self)
         return {'FINISHED'}
 
     def execute(self, context):
-        if engine.check_for_updates():
-            zipball_url = f"{engine.api_url}/repos/{engine.user}/{engine.repo}/zipball/{engine.check_for_updates()}"
-
-            response = requests.get(zipball_url)
-            if response.status_code != 200:
-                self.report({'ERROR'},"Error getting update")
-                return {'CANCELLED'}
-
-            addon_path = os.path.dirname(__file__)
-            zip_data = io.BytesIO(response.content)
-
-            with zipfile.ZipFile(zip_data, 'r') as zip_ref:
-                # Check if the extracted files already exist and delete them
-                for name in zip_ref.namelist():
-                    file_path = os.path.join(addon_path, name)
-                    if os.path.exists(file_path):
-                        os.rmdir(file_path)
-                # Extract the contents of the zipball to the add-on's directory
-                zip_ref.extractall(addon_path)
-            self.report({'INFO'}, "Add-on has been updated. Please restart Blender to apply changes.")
+        engine.check_for_updates()
+        if not engine.user or not engine.repo:
+            self.report({'ERROR'},"GitHub user and repository details are not set.")
+            return {'CANCELLED'}
+        if engine._latest_version != engine._current_version:
+            self.report({'INFO'},"A new version is available!")
+        else:
+            self.report({'INFO'},"You are already using the latest version of the add-on.")
         return {'FINISHED'}
 
-class LicensePreferences(bpy.types.AddonPreferences):
+class AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
     def draw(self, context):
@@ -165,16 +202,20 @@ class LicensePreferences(bpy.types.AddonPreferences):
         row = box.row()
         row.scale_y = 2
         row.operator("addonupdater.release_notes", icon="HELP")
-        if engine.check_for_updates():
-            row = box.row()
+        row = box.row()
+        row.scale_y = 2
+        row.operator(Check_for_update.bl_idname, icon="TRIA_DOWN_BAR")
+        if engine._latest_version != engine._current_version:
             row.scale_y = 2
             row.alert = True
-            row.label(text=f"Version {engine.check_for_updates()} is available!")
-            row.operator("addonupdater.update", icon="MOD_WAVE")
-        else:
+            row.operator(Update.bl_idname, icon="FILE_REFRESH")
             row = box.row()
-            row.scale_y = 2
-            row.label(text=f"Addon is running on latest version")
+            row.label(text=f"Version {engine._latest_version} is available!")
+        else:
+            if engine._update_date is not None:
+                row = box.row()
+                formatted_time = engine._update_date.strftime('%Y-%m-%d')
+                row.label(text=f"Last update: {formatted_time}")
 
 class AddonUpdaterPanel(bpy.types.Panel):
     bl_label = "Addon Updater"
@@ -194,9 +235,10 @@ class AddonUpdaterPanel(bpy.types.Panel):
 
 # Register classes
 classes = (
-    LicensePreferences,
+    AddonPreferences,
     AddCubeOperator,
     Release_Notes,
+    Check_for_update,
     Update,
     AddonUpdaterPanel,
 )
