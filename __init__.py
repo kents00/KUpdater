@@ -162,7 +162,6 @@ class GithubEngine:
                         os.rmdir(file_path)
                 zip_ref.extractall(addon_path)
                 self.extract_folder()
-                os.rmdir(str.startswith(f"{self.user}"))
         except zipfile.BadZipFile as e:
             print("Error extracting zip file:", e)
             return None
@@ -273,7 +272,6 @@ class AddonUpdaterPanel(bpy.types.Panel):
         col.operator(AddCubeOperator.bl_idname, icon="MESH_CUBE")
         return {'FINISHED'}
 
-# Register classes
 classes = (
     AddonPreferences,
     AddCubeOperator,
@@ -285,7 +283,7 @@ classes = (
 
 def register():
 
-    engine.user = "kents00"
+    engine.user = "kents00" #Replace this with your username
     engine.repo = "KUpdater"  # Replace this with your repository name
     engine.token = None  # Set your GitHub token here if necessary
 
