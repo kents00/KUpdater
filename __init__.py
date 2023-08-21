@@ -3,7 +3,7 @@ bl_info = {
     "description" : "KUpdater allows users to directly update their addons in blender.",
     "author" : "Kent Edoloverio",
     "blender" : (3,5,1),
-    "version" : (6,1,1),
+    "version" : (1,3,0),
     "category" : "3D View",
     "location" : "3D View > KUpdater",
     "warning" : "",
@@ -160,7 +160,7 @@ class GithubEngine:
                     file_path = os.path.join(addon_path, name)
                     if os.path.exists(file_path):
                         os.rmdir(file_path)
-                zip_ref.extractall(addon_path) 
+                zip_ref.extractall(addon_path)
                 self.extract_folder()
                 os.rmdir(str.startswith(f"{self.user}"))
         except zipfile.BadZipFile as e:
