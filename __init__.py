@@ -226,7 +226,7 @@ class Check_for_update(bpy.types.Operator):
             return {'CANCELLED'}
         if engine._current_version != engine._latest_version:
             self.report({'INFO'},"A new version is available!")
-        elif engine._current_version == engine._latest_version:
+        if engine._current_version == engine._latest_version:
             self.report({'INFO'},"You are already using the latest version of the add-on.")
         return {'FINISHED'}
 
