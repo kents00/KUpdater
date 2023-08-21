@@ -1,17 +1,18 @@
 bl_info = {
-    "name" : "Addon Updater",
-    "description" : "Sample addon updater",
+    "name" : "KUpdater",
+    "description" : "KUpdater allows users to directly update their addons in blender.",
     "author" : "Kent Edoloverio",
     "blender" : (3,5,1),
-    "version" : (6,22,23),
+    "version" : (6,1,1),
     "category" : "3D View",
-    "location" : "3D View > Addon Updater",
+    "location" : "3D View > KUpdater",
     "warning" : "",
     "wiki_url" : "https://github.com/kents00/KNTY-Updater",
     "tracker_url" : "https://github.com/kents00/KNTY-Updater/issues",
 }
 
 import bpy
+import shutil
 import requests
 import webbrowser
 import json
@@ -19,6 +20,7 @@ import io
 import zipfile
 import os
 import datetime
+
 
 class GithubEngine:
     def __init__(self):
@@ -89,31 +91,57 @@ class GithubEngine:
             return False
         return True
 
+    def extract_folder(self):
+        base_path = os.path.join(os.path.dirname(__file__), "..", f"{self.repo}")
+        directories = [item for item in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, item))]
+        # Find the specific folder that starts with username
+        target_folder = None
+        for directory_name in directories:
+            if directory_name.startswith(f"{self.user}"):
+                target_folder = os.path.join(base_path, directory_name)
+                break
+
+        if target_folder is not None:
+            destination_folder = base_path
+            print(f"Found target folder: {target_folder}")
+            for item in os.listdir(target_folder):
+                source_item_path = os.path.join(target_folder, item)
+                destination_item_path = os.path.join(destination_folder, item)
+
+                if os.path.isfile(source_item_path):
+                    shutil.copy2(source_item_path, destination_item_path)
+                elif os.path.isdir(source_item_path):
+                    shutil.copytree(source_item_path, destination_item_path)
+            print("Contents extracted to base path.")
+        else:
+            print("Target folder not found.")
+
     @bpy.app.handlers.persistent
     def check_for_updates(self):
-        update_url = f"{self._api_url}/repos/{self._user}/{self._repo}/releases/latest"
+        update_url = f"{self.api_url}/repos/{self.user}/{self.repo}/releases/latest"
 
         try:
             response = requests.get(update_url)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
             print("Error checking for updates:", e)
+            if response.status_code != 200:
+                print("Response content:", response.content)
             return None
 
         data = json.loads(response.text)
         latest_version = data["tag_name"]
+        date = datetime.datetime.now()
 
 
         current_version = f"{bl_info['version'][0]}.{bl_info['version'][1]}.{bl_info['version'][2]}"
-        self._update_date = datetime.datetime.now()
+        self._update_date = date
         self._latest_version = latest_version
         self._current_version = current_version
 
         if latest_version != current_version:
             return latest_version
-        else:
-            return None
-
+        return current_version,date
 
     @bpy.app.handlers.persistent
     def update(self):
@@ -132,7 +160,9 @@ class GithubEngine:
                     file_path = os.path.join(addon_path, name)
                     if os.path.exists(file_path):
                         os.rmdir(file_path)
-                zip_ref.extractall(addon_path)
+                zip_ref.extractall(addon_path) 
+                self.extract_folder()
+                os.rmdir(str.startswith(f"{self.user}"))
         except zipfile.BadZipFile as e:
             print("Error extracting zip file:", e)
             return None
@@ -154,12 +184,16 @@ class Release_Notes(bpy.types.Operator):
     bl_idname = "addonupdater.release_notes"
 
     def execute(self, context):
-        webbrowser.open(f"https://github.com/{engine.user}/{engine.repo}", new=2)
+        webbrowser.open(f"https://github.com/{engine.user}/{engine.repo}", new=1)
         return {'FINISHED'}
 
 class Update(bpy.types.Operator):
     bl_label = "Update"
     bl_idname = "addonupdater.checkupdate"
+
+    @classmethod
+    def poll(cls,context):
+        return engine._current_version != engine._latest_version
 
     def invoke(self,context, event):
         self.execute(self)
@@ -170,6 +204,10 @@ class Update(bpy.types.Operator):
         if engine._response.status_code != 200:
             self.report({'ERROR'},"Error getting update")
             return {'CANCELLED'}
+
+        if engine._current_version == engine._latest_version:
+            self.report({'ERROR'}, "You are already using the latest version of the add-on.")
+            return{'CANCELLED'}
 
         self.report({'INFO'}, "Add-on has been updated. Please restart Blender to apply changes.")
         return {'FINISHED'}
@@ -187,9 +225,9 @@ class Check_for_update(bpy.types.Operator):
         if not engine.user or not engine.repo:
             self.report({'ERROR'},"GitHub user and repository details are not set.")
             return {'CANCELLED'}
-        if engine._latest_version != engine._current_version:
+        if engine._current_version != engine._latest_version:
             self.report({'INFO'},"A new version is available!")
-        else:
+        elif engine._current_version == engine._latest_version:
             self.report({'INFO'},"You are already using the latest version of the add-on.")
         return {'FINISHED'}
 
@@ -205,17 +243,19 @@ class AddonPreferences(bpy.types.AddonPreferences):
         row = box.row()
         row.scale_y = 2
         row.operator(Check_for_update.bl_idname, icon="TRIA_DOWN_BAR")
-        if engine._latest_version != engine._current_version:
-            row.scale_y = 2
-            row.alert = True
-            row.operator(Update.bl_idname, icon="FILE_REFRESH")
+        row.scale_y = 2
+        row.alert = True
+        row.operator(Update.bl_idname, icon="FILE_REFRESH")
+        if engine._latest_version is not None:
             row = box.row()
             row.label(text=f"Version {engine._latest_version} is available!")
+        if engine._update_date is not None:
+            row = box.row()
+            formatted_time = engine._update_date.strftime('%Y-%m-%d')
+            row.label(text=f"Last update: {formatted_time}")
         else:
-            if engine._update_date is not None:
-                row = box.row()
-                formatted_time = engine._update_date.strftime('%Y-%m-%d')
-                row.label(text=f"Last update: {formatted_time}")
+            row = box.row()
+            row.label(text=f"Last update: Never")
 
 class AddonUpdaterPanel(bpy.types.Panel):
     bl_label = "Addon Updater"
@@ -246,7 +286,7 @@ classes = (
 def register():
 
     engine.user = "kents00"
-    engine.repo = "KNTY-Updater"  # Replace this with your repository name
+    engine.repo = "KUpdater"  # Replace this with your repository name
     engine.token = None  # Set your GitHub token here if necessary
 
     for cls in classes:
