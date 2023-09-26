@@ -7,3 +7,7 @@ This add-on allows blender add-on developers to automatically check for updates.
 - Using GitHub repositories as the source of code versions
 - Checking for updates with a single click
 - Update installation with a single click
+
+## Issues
+
+If you're having trouble integrating this code into your addon, [open a new issue](https://github.com/kents00/KUpdater/issues). As the module continues to develop, it will be easier for more developers to integrate updates and improve blender's overall user performance!
