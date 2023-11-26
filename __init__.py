@@ -12,7 +12,7 @@ bl_info = {
     "description": "KUpdater allows users to directly update their addons in blender.",
     "author": "Kent Edoloverio",
     "blender": (3, 5, 1),
-    "version": (1, 3, 0),
+    "version": (1, 3, 1),
     "category": "3D View",
     "location": "3D View > KUpdater",
     "warning": "",
@@ -265,10 +265,6 @@ class Update(bpy.types.Operator):
     def poll(cls, context):
         return engine._current_version != engine._latest_version
 
-    def invoke(self, context, event):
-        self.execute(self)
-        return {'FINISHED'}
-
     def execute(self, context):
         engine.update()
         if engine._response.status_code != 200:
@@ -303,7 +299,7 @@ class Check_for_update(bpy.types.Operator):
             return {'CANCELLED'}
         if engine._current_version != engine._latest_version:
             self.report({'INFO'}, "A new version is available!")
-        if engine._current_version == engine._latest_version:
+        elif engine._current_version == engine._latest_version:
             self.report(
                 {'INFO'}, "You are already using the latest version of the add-on.")
         return {'FINISHED'}
@@ -329,7 +325,8 @@ class AddonPreferences(bpy.types.AddonPreferences):
 
         json_file_path = os.path.join(
             os.path.dirname(__file__), "version_info.json")
-        if os.path.exists(json_file_path):
+
+        try:
             with open(json_file_path, 'r') as json_file:
                 version_info = json.load(json_file)
                 engine._update_date = version_info.get("update_date")
@@ -339,18 +336,21 @@ class AddonPreferences(bpy.types.AddonPreferences):
                 if engine._latest_version is not None:
                     row = box.row()
                     row.label(
-                        text=f"Version {engine._latest_version} is available!")
-                if engine._current_version == engine._latest_version:
+                        text=f"Version: {engine._latest_version}")
+                elif engine._current_version == engine._latest_version:
                     row = box.row()
                     row.label(
                         text=f"You are using the latest version: {engine._latest_version}")
                 if engine._update_date is not None:
                     row = box.row()
-                    formatted_time = version_info["update_date"]
-                    row.label(text=f"Last update: {formatted_time}")
-        else:
+                    row.label(text=f"Last update: {engine._update_date}")
+        except json.decoder.JSONDecodeError as e:
+            print(f"Error loading JSON file: {e}")
             row = box.row()
-            row.label(text="Last Update: Never")
+            row.label(text="Last update: Never")
+        except FileNotFoundError:
+            row = box.row()
+            row.label(text="Error loading version information.")
 
 
 class AddonUpdaterPanel(bpy.types.Panel):
