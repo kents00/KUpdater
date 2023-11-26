@@ -91,6 +91,9 @@ class GithubEngine:
         return True
 
     def delete_file_in_folder(self):
+        """
+        The function `delete_file_in_folder` deletes all files inside a specified folder.
+        """
         folder_path = os.path.join(
             os.path.dirname(__file__), "..", f"{self.repo}")
 
@@ -101,7 +104,7 @@ class GithubEngine:
             for directory_name in directories:
                 if directory_name.startswith(f"{self.user}"):
                     target_folder = os.path.join(folder_path, directory_name)
-                    for root, files in os.walk(target_folder):
+                    for root, dirs, files in os.walk(target_folder):
                         for file in files:
                             file_path = os.path.join(root, file)
                             os.remove(file_path)
@@ -111,6 +114,10 @@ class GithubEngine:
             print(f"Error deleting files in {folder_path}: {e}")
 
     def delete_folder(self):
+        """
+        The `delete_folder` function deletes a specific folder and its contents within a given
+        repository.
+        """
         folder_path = os.path.join(
             os.path.dirname(__file__), "..", f"{self.repo}")
 
@@ -126,6 +133,10 @@ class GithubEngine:
             print(f"Error deleting folder {folder_path}: {e}")
 
     def extract_folder(self):
+        """
+        The function `extract_folder` extracts the contents of a specific folder from a given repository
+        and copies them to the base path.
+        """
         folder_path = os.path.join(
             os.path.dirname(__file__), "..", f"{self.repo}")
         directories = [item for item in os.listdir(
@@ -154,7 +165,14 @@ class GithubEngine:
 
     @bpy.app.handlers.persistent
     def check_for_updates(self):
+        """
+        The above function checks for updates of a Blender add-on by making a request to a specified API
+        endpoint and compares the latest version with the current version of the add-on.
+        :return: The code is returning the latest version of the addon, the current version of the
+        addon, and the update date.
+        """
         update_url = f"{self.api_url}/repos/{self.user}/{self.repo}/releases/latest"
+        addon_path = os.path.dirname(__file__)
 
         try:
             response = requests.get(update_url)
@@ -166,20 +184,33 @@ class GithubEngine:
             return None
 
         data = json.loads(response.text)
-        latest_version = data["tag_name"]
         date = datetime.datetime.now()
-
+        latest_version = data["tag_name"]
         current_version = f"{bl_info['version'][0]}.{bl_info['version'][1]}.{bl_info['version'][2]}"
-        self._update_date = date
-        self._latest_version = latest_version
-        self._current_version = current_version
 
-        if latest_version != current_version:
-            return latest_version
-        return current_version, date
+        addon_version = {
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "update_date": str(date),
+        }
+        json_file_path = os.path.join(addon_path, "version_info.json")
+        try:
+            with open(json_file_path, 'w') as json_file:
+                json.dump(addon_version, json_file, indent=1)
+        except zipfile.BadZipFile as e:
+            print("Error extracting zip file:", e)
+            return None
+        if self._latest_version != self._current_version:
+            return self._latest_version
+        return self._current_version, self._update_date
 
     @bpy.app.handlers.persistent
     def update(self):
+        """
+        The `update` function downloads a zip file from a specified URL, extracts its contents, and
+        performs some additional operations on the extracted files.
+        :return: None if there is an error extracting the zip file.
+        """
         zipball_url = f"{self.api_url}/repos/{self.user}/{self.repo}/zipball/{self.check_for_updates()}"
 
         response = requests.get(zipball_url)
@@ -201,6 +232,7 @@ class GithubEngine:
 
 engine = GithubEngine()
 
+
 class AddCubeOperator(bpy.types.Operator):
     bl_label = "ADD CUBE"
     bl_idname = "add_simple.cube"
@@ -210,6 +242,9 @@ class AddCubeOperator(bpy.types.Operator):
         bpy.ops.mesh.primitive_cube_add()
         return {'FINISHED'}
 
+
+# The `Release_Notes` class is an operator in Blender that opens the release notes of an addon in a
+# web browser.
 class Release_Notes(bpy.types.Operator):
     bl_label = "View the Release Notes"
     bl_idname = "addonupdater.release_notes"
@@ -220,6 +255,8 @@ class Release_Notes(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# The above class is an operator in Blender that checks for updates to an add-on and updates it if a
+# new version is available.
 class Update(bpy.types.Operator):
     bl_label = "Update"
     bl_idname = "addonupdater.checkupdate"
@@ -248,6 +285,8 @@ class Update(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# The Check_for_update class is a Blender operator that checks for updates to an add-on and reports if
+# a new version is available.
 class Check_for_update(bpy.types.Operator):
     bl_label = "Check Update"
     bl_idname = "addonupdater.update"
@@ -270,6 +309,8 @@ class Check_for_update(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# The above class is an addon preferences class in Python that displays information about the latest
+# version of the addon and provides options to check for updates and update the addon.
 class AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
@@ -285,16 +326,32 @@ class AddonPreferences(bpy.types.AddonPreferences):
         row.scale_y = 2
         row.alert = True
         row.operator(Update.bl_idname, icon="FILE_REFRESH")
-        if engine._latest_version is not None:
-            row = box.row()
-            row.label(text=f"Version {engine._latest_version} is available!")
-        if engine._update_date is not None:
-            row = box.row()
-            formatted_time = engine._update_date.strftime('%Y-%m-%d')
-            row.label(text=f"Last update: {formatted_time}")
+
+        json_file_path = os.path.join(
+            os.path.dirname(__file__), "version_info.json")
+        if os.path.exists(json_file_path):
+            with open(json_file_path, 'r') as json_file:
+                version_info = json.load(json_file)
+                engine._update_date = version_info.get("update_date")
+                engine._latest_version = version_info.get("latest_version")
+                engine._current_version = version_info.get("current_version")
+
+                if engine._latest_version is not None:
+                    row = box.row()
+                    row.label(
+                        text=f"Version {engine._latest_version} is available!")
+                if engine._current_version == engine._latest_version:
+                    row = box.row()
+                    row.label(
+                        text=f"You are using the latest version: {engine._latest_version}")
+                if engine._update_date is not None:
+                    row = box.row()
+                    formatted_time = version_info["update_date"]
+                    row.label(text=f"Last update: {formatted_time}")
         else:
             row = box.row()
-            row.label(text="Last update: Never")
+            row.label(text="Last Update: Never")
+
 
 class AddonUpdaterPanel(bpy.types.Panel):
     bl_label = "Addon Updater"
@@ -311,6 +368,7 @@ class AddonUpdaterPanel(bpy.types.Panel):
         col.scale_y = 2.0
         col.operator(AddCubeOperator.bl_idname, icon="MESH_CUBE")
         return {'FINISHED'}
+
 
 classes = (
     AddonPreferences,
@@ -331,10 +389,12 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
+
 def unregister():
     engine.clear_state()
     for cls in classes:
         bpy.utils.unregister_class(cls)
+
 
 if __name__ == "__main__":
     register()
