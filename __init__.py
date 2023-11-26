@@ -107,7 +107,7 @@ class GithubEngine:
                             os.remove(file_path)
 
             print(f"Files inside {folder_path} deleted successfully.")
-        except Exception as e:
+        except FileNotFoundError as e:
             print(f"Error deleting files in {folder_path}: {e}")
 
     def delete_folder(self):
@@ -122,7 +122,7 @@ class GithubEngine:
                     target_folder = os.path.join(folder_path, directory_name)
                     shutil.rmtree(target_folder)
             print(f"Folder {folder_path} deleted successfully.")
-        except Exception as e:
+        except FileNotFoundError as e:
             print(f"Error deleting folder {folder_path}: {e}")
 
     def extract_folder(self):
@@ -294,7 +294,7 @@ class AddonPreferences(bpy.types.AddonPreferences):
             row.label(text=f"Last update: {formatted_time}")
         else:
             row = box.row()
-            row.label(text=f"Last update: Never")
+            row.label(text="Last update: Never")
 
 class AddonUpdaterPanel(bpy.types.Panel):
     bl_label = "Addon Updater"
