@@ -107,7 +107,8 @@ class GithubEngine:
                     for root, dirs, files in os.walk(target_folder):
                         for file in files:
                             file_path = os.path.join(root, file)
-                            os.remove(file_path)
+                            if file == "version_info.json":
+                                os.remove(file_path)
 
             print(f"Files inside {folder_path} deleted successfully.")
         except FileNotFoundError as e:
