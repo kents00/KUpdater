@@ -1,7 +1,7 @@
-from .Updater_OP import *
-from .Updater import engine
 import bpy
 import os
+from .Updater import engine
+from .Updater_OP import *
 
 bl_info = {
     "name": "KUpdater",
@@ -13,8 +13,6 @@ bl_info = {
     "warning": "",
     "category": "3D View",
 }
-# The above class is an addon preferences class in Python that displays information about the latest
-# version of the addon and provides options to check for updates and update the addon.
 
 
 class AddonPreferences(bpy.types.AddonPreferences):
