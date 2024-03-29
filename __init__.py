@@ -1,19 +1,18 @@
 import bpy
 import os
-from .Updater import engine
 from .Updater_OP import *
+from .Updater import engine
 
 bl_info = {
     "name": "KUpdater",
     "author": "Kent Edoloverio",
     "description": "Update your addon easily by using this addon",
     "blender": (4, 0, 2),
-    "version": (1, 3, 2),
+    "version": (1, 3, 11),
     "location": "3D View > KUpdater",
     "warning": "",
     "category": "3D View",
 }
-
 
 class AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__

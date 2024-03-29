@@ -8,9 +8,7 @@ import requests
 import shutil
 import bpy
 
-bl_info = {
-    "version": (1, 3, 2)
-}
+bl_info = {"version": (1, 3, 11)}
 
 
 class GithubEngine:
@@ -87,7 +85,7 @@ class GithubEngine:
         The function `delete_file_in_folder` deletes all files inside a specified folder.
         """
         folder_path = os.path.join(
-            os.path.dirname(__file__), "..", f"{self.repo}-main")
+            os.path.dirname(__file__), "..", f"{self.repo}")
 
         directories = [item for item in os.listdir(
             folder_path) if os.path.isdir(os.path.join(folder_path, item))]
@@ -112,7 +110,7 @@ class GithubEngine:
         repository.
         """
         folder_path = os.path.join(
-            os.path.dirname(__file__), "..", f"{self.repo}-main")
+            os.path.dirname(__file__), "..", f"{self.repo}")
 
         directories = [item for item in os.listdir(
             folder_path) if os.path.isdir(os.path.join(folder_path, item))]
@@ -131,7 +129,7 @@ class GithubEngine:
         and copies them to the base path.
         """
         folder_path = os.path.join(
-            os.path.dirname(__file__), "..", f"{self.repo}-main")
+            os.path.dirname(__file__), "..", f"{self.repo}")
         directories = [item for item in os.listdir(
             folder_path) if os.path.isdir(os.path.join(folder_path, item))]
         # Find the specific folder that starts with username
