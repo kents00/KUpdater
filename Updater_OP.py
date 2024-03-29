@@ -1,9 +1,18 @@
+import os
 import bpy
+import json
 import webbrowser
-from .Updater import *
+from .Updater import engine
+
+json_path = os.path.join(os.path.dirname(__file__), "version_info.json")
+
+with open(json_path, 'r') as json_file:
+    data = json.load(json_file)
 
 # The `Release_Notes` class is an operator in Blender that opens the release notes of an addon in a
 # web browser.
+
+
 class Release_Notes(bpy.types.Operator):
     bl_label = "View the Release Notes"
     bl_idname = "addonupdater.release_notes"
