@@ -3,13 +3,11 @@ import os
 import zipfile
 import io
 import json
-import webbrowser
 import requests
 import shutil
 import bpy
 
-bl_info = {"version": (1, 3, 11)}
-
+bl_info = {"version": (1, 3, 1)}
 
 class GithubEngine:
     def __init__(self):
@@ -147,18 +145,9 @@ class GithubEngine:
                 destination_item_path = os.path.join(destination_folder, item)
 
                 if os.path.isfile(source_item_path):
-                    if not os.path.exists(destination_item_path):
-                        shutil.copy2(source_item_path, destination_item_path)
-                    else:
-                        print(
-                            f"File {item} already exists at the destination. Skipping.")
+                    shutil.copy2(source_item_path, destination_item_path)
                 elif os.path.isdir(source_item_path):
-                    if not os.path.exists(destination_item_path):
-                        shutil.copytree(source_item_path,
-                                        destination_item_path)
-                    else:
-                        print(
-                            f"Directory {item} already exists at the destination. Skipping.")
+                    shutil.copytree(source_item_path, destination_item_path)
             print("Contents extracted to base path.")
         else:
             print("Target folder not found.")
@@ -173,6 +162,9 @@ class GithubEngine:
         """
         update_url = f"{self.api_url}/repos/{self.user}/{self.repo}/releases/latest"
         addon_path = os.path.dirname(__file__)
+
+        if self._current_version is None:
+            raise ValueError("current_version not yet defined")
 
         try:
             response = requests.get(update_url)
@@ -200,8 +192,9 @@ class GithubEngine:
         except zipfile.BadZipFile as e:
             print("Error extracting zip file:", e)
             return None
-
-        return self._current_version, self._update_date, self._latest_version
+        if self._latest_version != self._current_version:
+            return self._latest_version
+        return self._current_version, self._update_date
 
     @bpy.app.handlers.persistent
     def update(self):
